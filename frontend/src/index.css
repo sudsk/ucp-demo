@@ -77,3 +77,9 @@ html, body, #root {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* ── Wallet modal animations ── */
+@keyframes walletFadeIn  { from { opacity: 0 } to { opacity: 1 } }
+@keyframes walletFadeOut { from { opacity: 1 } to { opacity: 0 } }
+@keyframes walletSlideUp   { from { opacity: 0; transform: translateY(40px) scale(0.96) } to { opacity: 1; transform: translateY(0) scale(1) } }
+@keyframes walletSlideDown { from { opacity: 1; transform: translateY(0) scale(1) } to { opacity: 0; transform: translateY(30px) scale(0.97) } }
