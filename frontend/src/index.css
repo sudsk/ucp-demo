@@ -1,57 +1,79 @@
+@import url('https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&family=Google+Sans+Display:wght@400;500&family=Roboto+Mono:wght@400;500&display=swap');
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
+  /* Google colours */
+  --blue:   #1a73e8;
+  --green:  #34A853;
+  --red:    #EA4335;
+  --yellow: #FBBC05;
+  --grey-1: #202124;
+  --grey-2: #5f6368;
+  --grey-3: #80868b;
+  --grey-4: #9aa0a6;
+  --grey-5: #dadce0;
+  --grey-6: #e8eaed;
+  --grey-7: #f1f3f4;
+  --grey-8: #f8f9fa;
+
+  /* Legacy theme vars (used in ProductCards / OrderCards) */
   --navy:       #0D1B2A;
-  --navy-mid:   #1A2E42;
-  --navy-light: #243B53;
-  --teal:       #00C2B2;
-  --teal-dim:   rgba(0,194,178,0.15);
-  --orange:     #F97316;
-  --orange-dim: rgba(249,115,22,0.15);
-  --green:      #22C55E;
-  --green-dim:  rgba(34,197,94,0.15);
-  --blue:       #3DBBDB;
-  --blue-dim:   rgba(61,187,219,0.15);
-  --yellow:     #FBBF24;
-  --purple:     #A78BFA;
-  --white:      #FFFFFF;
-  --off-white:  #E8EFF5;
-  --muted:      #8BA3B8;
-  --border:     rgba(255,255,255,0.06);
-  --font-display: 'Syne', sans-serif;
-  --font-body:    'Inter', sans-serif;
-  --font-mono:    'DM Mono', monospace;
+  --navy-mid:   #f1f3f4;
+  --navy-light: #f8f9fa;
+  --teal:       #1a73e8;
+  --teal-dim:   #e8f0fe;
+  --blue-light: #4285F4;
+  --off-white:  #202124;
+  --muted:      #5f6368;
+  --border:     #e8eaed;
+  --green:      #34A853;
+  --yellow:     #FBBC05;
+  --white:      #fff;
+
+  --font-body:    'Google Sans', Arial, sans-serif;
+  --font-display: 'Google Sans Display', 'Google Sans', Arial, sans-serif;
+  --font-mono:    'Roboto Mono', monospace;
 }
 
 html, body, #root {
   height: 100%;
-  background: var(--navy);
-  color: var(--off-white);
   font-family: var(--font-body);
+  color: var(--grey-1);
+  background: #fff;
   -webkit-font-smoothing: antialiased;
 }
 
-::-webkit-scrollbar { width: 4px; }
-::-webkit-scrollbar-track { background: var(--navy); }
-::-webkit-scrollbar-thumb { background: var(--navy-light); border-radius: 2px; }
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #dadce0; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #9aa0a6; }
 
-@keyframes fadeUp {
-  from { opacity: 0; transform: translateY(12px); }
+/* Animations */
+@keyframes aimFadeUp {
+  from { opacity: 0; transform: translateY(8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+@keyframes aimSpin {
+  to { transform: rotate(360deg); }
+}
+@keyframes aimDot {
+  0%, 80%, 100% { transform: scale(0.7); opacity: 0.4; }
+  40%           { transform: scale(1.1); opacity: 1; }
+}
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50%       { opacity: 0.4; }
+  0%, 100% { opacity: 0.4; }
+  50%       { opacity: 1; }
+}
+@keyframes badgePop {
+  from { opacity: 0; transform: scale(0.9); }
+  to   { opacity: 1; transform: scale(1); }
+}
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
 }
 @keyframes spin {
   to { transform: rotate(360deg); }
-}
-@keyframes slideIn {
-  from { opacity: 0; transform: translateX(-8px); }
-  to   { opacity: 1; transform: translateX(0); }
-}
-@keyframes badgePop {
-  0%   { opacity: 0; transform: scale(0.85); }
-  60%  { transform: scale(1.04); }
-  100% { opacity: 1; transform: scale(1); }
 }

@@ -10,8 +10,11 @@ import httpx
 UCP_BASE = "http://localhost:8000"
 
 PERSONAS = {
-    "alex": {"first_name": "Alex",  "last_name": "Johnson", "email": "alex@example.com", "tier": "Gold",   "loyalty_pct": 5},
-    "sam":  {"first_name": "Sam",   "last_name": "Patel",   "email": "sam@example.com",  "tier": "Silver", "loyalty_pct": 3},
+    "james": {"first_name": "James", "last_name": "Mitchell", "email": "james.mitchell@example.com", "tier": "Gold",   "loyalty_pct": 5},
+    "sarah": {"first_name": "Sarah", "last_name": "Chen",     "email": "sarah.chen@example.com",     "tier": "Silver", "loyalty_pct": 3},
+    # Legacy aliases kept for compatibility
+    "alex":  {"first_name": "James", "last_name": "Mitchell", "email": "james.mitchell@example.com", "tier": "Gold",   "loyalty_pct": 5},
+    "sam":   {"first_name": "Sarah", "last_name": "Chen",     "email": "sarah.chen@example.com",     "tier": "Silver", "loyalty_pct": 3},
     "guest":{"first_name": "Guest", "last_name": "",        "email": "",                 "tier": "Guest",  "loyalty_pct": 0},
 }
 
@@ -26,7 +29,7 @@ _state: dict = {"persona": None, "checkout_id": None}
 def set_persona(persona_name: str) -> dict:
     """
     Set the shopper identity for this session.
-    persona_name: 'alex' (Gold), 'sam' (Silver), or 'guest'
+    persona_name: 'james' (Gold), 'sarah' (Silver), or 'guest'
     Returns the persona details including loyalty tier.
     """
     key = persona_name.lower()

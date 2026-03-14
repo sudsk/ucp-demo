@@ -95,4 +95,3 @@ When you join the Google UCP waitlist and get approved:
 4. Replace the hardcoded catalogue with your real PIM API
 
 The protocol structure, checkout flow, and SDK models are already production-ready.
-
