@@ -87,6 +87,7 @@ async def chat(request: Request):
                 contents.append({"role": role, "parts": [{"text": m["content"]}]})
 
             # Agentic loop — keep calling until no more tool calls
+            _seen_tools = set()  # track which tools have run to prevent repeats
             for _turn in range(12):
                 import time as _time
                 _t0 = _time.time()
@@ -117,14 +118,14 @@ async def chat(request: Request):
                 contents.append(resp.candidates[0].content)
 
                 tool_results = []
-                # Deduplicate — only execute each tool once per turn
-                seen_tools = set()
+                # Deduplicate — skip any tool already called this session
                 deduped_calls = []
                 for call in calls:
-                    if call.name not in seen_tools:
-                        seen_tools.add(call.name)
+                    if call.name not in _seen_tools:
                         deduped_calls.append(call)
                 calls = deduped_calls
+                if not calls:
+                    break
 
                 for call in calls:
                     fn  = TOOL_MAP.get(call.name)
@@ -147,9 +148,16 @@ async def chat(request: Request):
 
                 contents.append({"role": "user", "parts": tool_results})
 
-                # Stop the loop after checkout or search — prevent runaway tool loops
-                if any(c.name in ("create_checkout", "search_products") for c in calls):
+                # Add executed tools to seen set
+                for c in calls:
+                    _seen_tools.add(c.name)
+
+                # Stop after create_checkout — wait for user confirmation
+                if "create_checkout" in _seen_tools:
                     break
+
+                # Filter out any tools already seen to prevent repeat calls
+                # (applied on next iteration via dedup)
 
             yield f"data: {json.dumps({'type':'done'})}\n\n"
 

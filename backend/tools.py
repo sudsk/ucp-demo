@@ -200,6 +200,10 @@ def confirm_payment(checkout_id: str = "") -> dict:
     resp.raise_for_status()
     data = resp.json()
 
+    # Reset session state so a new purchase can start cleanly
+    _state["checkout_id"] = None
+    _state["persona"] = None
+
     totals = {t["type"]: t["amount"] for t in data["totals"]}
     order_conf = data.get("order_confirmation", {})
 
