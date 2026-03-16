@@ -76,7 +76,7 @@ async def chat(request: Request):
             from agent import SYSTEM_PROMPT, TOOL_MAP, TOOLS
 
             client = genai.Client(api_key=api_key)
-            model  = os.getenv("GEMINI_MODEL", "gemini-3-flash")
+            model  = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
 
             tools_config = [{"function_declarations": [_tool_schema(fn) for fn in TOOLS]}]
 
@@ -95,7 +95,7 @@ async def chat(request: Request):
                         system_instruction=SYSTEM_PROMPT,
                         tools=tools_config,
                         temperature=0.1,
-                        thinking_config=types.ThinkingConfig(thinking_budget=0),
+                        thinking_config=types.ThinkingConfig(thinking_level="none"),
                     ),
                 )
 
