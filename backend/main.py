@@ -124,8 +124,14 @@ async def chat(request: Request):
                     if call.name not in _seen_tools:
                         deduped_calls.append(call)
                 calls = deduped_calls
+
+                # Only break on empty calls if checkout is done — otherwise keep looping
                 if not calls:
-                    break
+                    if "create_checkout" in _seen_tools:
+                        break
+                    # No new tool calls but checkout not done — let Gemini continue
+                    contents.append(resp.candidates[0].content)
+                    continue
 
                 for call in calls:
                     fn  = TOOL_MAP.get(call.name)
