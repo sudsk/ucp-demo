@@ -11,11 +11,7 @@ UCP_BASE = "http://localhost:8000"
 
 PERSONAS = {
     "james": {"first_name": "James", "last_name": "Mitchell", "email": "james.mitchell@example.com", "tier": "Gold",   "loyalty_pct": 5},
-    "sarah": {"first_name": "Sarah", "last_name": "Chen",     "email": "sarah.chen@example.com",     "tier": "Silver", "loyalty_pct": 3},
-    # Legacy aliases kept for compatibility
-    "alex":  {"first_name": "James", "last_name": "Mitchell", "email": "james.mitchell@example.com", "tier": "Gold",   "loyalty_pct": 5},
-    "sam":   {"first_name": "Sarah", "last_name": "Chen",     "email": "sarah.chen@example.com",     "tier": "Silver", "loyalty_pct": 3},
-    "guest":{"first_name": "Guest", "last_name": "",        "email": "",                 "tier": "Guest",  "loyalty_pct": 0},
+    "guest": {"first_name": "Guest", "last_name": "",          "email": "",                              "tier": "Guest",  "loyalty_pct": 0},
 }
 
 # Session state (in-memory per server run)
@@ -35,9 +31,6 @@ def set_persona(persona_name: str) -> dict:
     key = persona_name.lower()
     persona = PERSONAS.get(key, PERSONAS["guest"])
     _state["persona"] = key
-    # Do not reset checkout_id — a checkout may already be in progress
-    if not _state.get("checkout_id"):
-        _state["checkout_id"] = None
     return {
         "ucp_message": "Credential_Set",
         "persona": key,
@@ -228,4 +221,4 @@ def confirm_payment(checkout_id: str = "") -> dict:
 # Tool list for ADK agent registration
 # ---------------------------------------------------------------------------
 
-UCP_TOOLS = [set_persona, search_products, create_checkout, get_checkout, confirm_payment]
+UCP_TOOLS = [set_persona, search_products, create_checkout, confirm_payment]

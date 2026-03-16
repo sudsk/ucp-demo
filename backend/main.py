@@ -76,7 +76,7 @@ async def chat(request: Request):
             from agent import SYSTEM_PROMPT, TOOL_MAP, TOOLS
 
             client = genai.Client(api_key=api_key)
-            model  = os.getenv("GEMINI_MODEL", "gemini-3.1-flash-lite-preview")
+            model  = os.getenv("GEMINI_MODEL", "gemini-3-flash-lite-preview")
 
             tools_config = [{"function_declarations": [_tool_schema(fn) for fn in TOOLS]}]
 
@@ -143,6 +143,10 @@ async def chat(request: Request):
                     tool_results.append({"function_response": {"name": call.name, "response": result}})
 
                 contents.append({"role": "user", "parts": tool_results})
+
+                # Stop the loop after checkout is created — wait for user confirmation
+                if any(c.name == "create_checkout" for c in calls):
+                    break
 
             yield f"data: {json.dumps({'type':'done'})}\n\n"
 

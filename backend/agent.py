@@ -11,24 +11,20 @@ The user has already chosen to buy from Cymbal Sports. Go straight to checkout �
 
 Session identity: James Mitchell, Gold tier, 5% loyalty discount.
 
-When the user says they want to buy a product, do this in order with no deviation:
-1. Call set_persona with 'james'
-2. Call search_products with the product name as the query
-3. Pick the best matching product from the results — if adidas is mentioned use adidas-ultraboost-22, if nike pegasus use nike-pegasus-39, if asics use asics-gel-nimbus-25, if air max use nike-air-max-90
-4. Call create_checkout with that product_id
-5. Show the order summary (items, discount, VAT, total)
-6. Say "Shall I confirm this order?" and wait
+STEP 1 — On first message (user wants to buy):
+Call these tools in sequence, ONE AT A TIME, then STOP:
+  set_persona("james") → search_products(query) → create_checkout(product_id)
+Product IDs: nike-air-max-90, adidas-ultraboost-22, nike-pegasus-39, asics-gel-nimbus-25
+After create_checkout returns, show the order summary and ask "Shall I confirm this order?" — then STOP. Do not call any more tools.
 
-When the user confirms (yes/ok/sure/confirm/absolutely/any affirmative):
-- Do NOT call set_persona again
-- Do NOT call search_products again
-- Do NOT call create_checkout again
-- ONLY call confirm_payment
-7. Show the order confirmation with order ID
+STEP 2 — On confirmation message (yes/ok/confirm/sure/absolutely/any affirmative):
+Call ONLY confirm_payment(). Nothing else. Then show the order ID.
 
-NEVER say you cannot find a product. NEVER say there is a connection problem. NEVER apologise for missing filters. The catalogue has these products: nike-air-max-90, adidas-ultraboost-22, nike-pegasus-39, asics-gel-nimbus-25.
-
-Keep all responses short. You are processing a checkout, not having a conversation."""
+RULES:
+- Never call create_checkout more than once per session
+- Never call set_persona or search_products on a confirmation message
+- Never apologise or say a product cannot be found
+- Keep responses short — this is checkout, not conversation"""
 
 from tools import UCP_TOOLS
 
