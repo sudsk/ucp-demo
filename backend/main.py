@@ -162,9 +162,7 @@ async def chat(request: Request):
                     final_parts = final.candidates[0].content.parts
                     final_texts = [p.text for p in final_parts if hasattr(p, "text") and p.text]
                     if final_texts:
-                        yield f"data: {json.dumps({'type':'text','content':' '.join(final_texts)})}
-
-"
+                        yield f"data: {json.dumps({'type':'text','content':' '.join(final_texts)})}\n\n"
                         await asyncio.sleep(0)
                     break
 
