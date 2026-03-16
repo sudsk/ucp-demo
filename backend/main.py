@@ -76,7 +76,7 @@ async def chat(request: Request):
             from agent import SYSTEM_PROMPT, TOOL_MAP, TOOLS
 
             client = genai.Client(api_key=api_key)
-            model  = os.getenv("GEMINI_MODEL", "gemini-3-flash-lite-preview")
+            model  = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 
             tools_config = [{"function_declarations": [_tool_schema(fn) for fn in TOOLS]}]
 
@@ -88,6 +88,8 @@ async def chat(request: Request):
 
             # Agentic loop — keep calling until no more tool calls
             for _turn in range(12):
+                import time as _time
+                _t0 = _time.time()
                 resp = client.models.generate_content(
                     model=model,
                     contents=contents,
@@ -98,6 +100,7 @@ async def chat(request: Request):
                     ),
                 )
 
+                print(f"[GEMINI] turn={_turn} took {_time.time()-_t0:.2f}s", flush=True)
                 parts = resp.candidates[0].content.parts
                 texts = [p.text for p in parts if hasattr(p, "text") and p.text]
                 calls = [p.function_call for p in parts
@@ -144,8 +147,8 @@ async def chat(request: Request):
 
                 contents.append({"role": "user", "parts": tool_results})
 
-                # Stop the loop after checkout is created — wait for user confirmation
-                if any(c.name == "create_checkout" for c in calls):
+                # Stop the loop after checkout or search — prevent runaway tool loops
+                if any(c.name in ("create_checkout", "search_products") for c in calls):
                     break
 
             yield f"data: {json.dumps({'type':'done'})}\n\n"
