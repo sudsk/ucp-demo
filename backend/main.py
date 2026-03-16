@@ -154,9 +154,9 @@ async def chat(request: Request):
                         contents=contents,
                         config=types.GenerateContentConfig(
                             system_instruction=SYSTEM_PROMPT,
-                            tools=tools_config,
+                            tools=None,
                             temperature=0.1,
-                            ),
+                        ),
                     )
                     print(f"[GEMINI] final summary took {time.time()-t0:.2f}s", flush=True)
                     final_parts = final.candidates[0].content.parts
