@@ -35,7 +35,9 @@ def set_persona(persona_name: str) -> dict:
     key = persona_name.lower()
     persona = PERSONAS.get(key, PERSONAS["guest"])
     _state["persona"] = key
-    _state["checkout_id"] = None
+    # Do not reset checkout_id — a checkout may already be in progress
+    if not _state.get("checkout_id"):
+        _state["checkout_id"] = None
     return {
         "ucp_message": "Credential_Set",
         "persona": key,
