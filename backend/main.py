@@ -161,6 +161,7 @@ async def chat(request: Request):
                     print(f"[GEMINI] final summary took {time.time()-t0:.2f}s", flush=True)
                     final_parts = final.candidates[0].content.parts
                     final_texts = [p.text for p in final_parts if hasattr(p, "text") and p.text]
+                    print(f"[FINAL] texts={final_texts}, calls={[p.function_call.name for p in final_parts if hasattr(p, 'function_call') and p.function_call]}", flush=True)
                     if final_texts:
                         yield f"data: {json.dumps({'type':'text','content':' '.join(final_texts)})}\n\n"
                         await asyncio.sleep(0)
