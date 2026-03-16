@@ -26,6 +26,14 @@ function detectQueryType(text) {
   return text.toLowerCase().includes('adidas') ? 'adidas' : 'default'
 }
 
+function stripMarkdown(text) {
+  return text
+    .replace(/\*\*(.*?)\*\*/g, '$1')   // **bold**
+    .replace(/\*(.*?)\*/g, '$1')        // *italic*
+    .replace(/^[\*\-] /gm, '• ')        // bullet points -> •
+    .trim()
+}
+
 function GoogleG({ size = 24 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24">
@@ -168,7 +176,7 @@ function Message({ msg, onBuy }) {
         {!isUser && msg.lastTool && <UCPBadge tool={msg.lastTool} />}
         {msg.text && (
           <div style={{ background: isUser ? '#1a73e8' : 'transparent', color: isUser ? '#fff' : '#202124', borderRadius: isUser ? '18px 4px 18px 18px' : '0', padding: isUser ? '10px 16px' : '4px 0', fontSize: '15px', lineHeight: '1.65', fontFamily: '"Google Sans",Arial,sans-serif', whiteSpace: 'pre-wrap' }}>
-            {msg.text}
+            {isUser ? msg.text : stripMarkdown(msg.text)}
           </div>
         )}
         {msg.shoppingResults && <ShoppingShelf results={msg.shoppingResults} onBuy={onBuy} />}
@@ -218,7 +226,7 @@ export default function App() {
   const [walletOpen, setWalletOpen] = useState(false)
   const [sessionActive, setSessionActive] = useState(false)
   const [showZero, setShowZero] = useState(true)
-  const [checkoutActive, setCheckoutActive] = useState(false)
+  const checkoutActiveRef = useRef(false)
   const endRef = useRef(null)
   const inputRef = useRef(null)
 
@@ -261,8 +269,8 @@ export default function App() {
           if (ev.type === 'tool_result') {
             initA(); const r = ev.result
             if (ev.tool === 'search_products' && r.products?.length) setMessages(prev => prev.map(m => m.id === aId ? { ...m, products: r.products } : m))
-            if (ev.tool === 'create_checkout' && r.checkout_id) { setMessages(prev => prev.map(m => m.id === aId ? { ...m, checkout: r } : m)); setCheckoutActive(true) }
-            if (ev.tool === 'confirm_payment' && r.order_id) { setMessages(prev => prev.map(m => m.id === aId ? { ...m, receipt: r } : m)); setCheckoutActive(false) }
+            if (ev.tool === 'create_checkout' && r.checkout_id) { setMessages(prev => prev.map(m => m.id === aId ? { ...m, checkout: r } : m)); checkoutActiveRef.current = true }
+            if (ev.tool === 'confirm_payment' && r.order_id) { setMessages(prev => prev.map(m => m.id === aId ? { ...m, receipt: r } : m)); checkoutActiveRef.current = false }
           }
           if (ev.type === 'error') { initA(); setMessages(prev => prev.map(m => m.id === aId ? { ...m, text: `⚠️ ${ev.content}` } : m)) }
         }
@@ -278,7 +286,7 @@ export default function App() {
     setInput(''); setShowZero(false)
     addMsg({ role: 'user', text: msg })
     // If checkout is in progress, all replies go to the UCP backend
-    if (checkoutActive) {
+    if (checkoutActiveRef.current) {
       await sendToBackend(msg)
       return
     }
@@ -286,7 +294,7 @@ export default function App() {
     const qt = detectQueryType(msg)
     const shelf = SHOPPING_RESULTS[qt]
     setMessages(prev => [...prev, { id: `shelf-${Date.now()}`, role: 'assistant', text: null, shoppingResults: shelf, lastTool: null }])
-  }, [input, loading, addMsg, sendToBackend, checkoutActive])
+  }, [input, loading, addMsg, sendToBackend])
 
   const handleBuy = useCallback((item) => {
     setShowZero(false)
@@ -296,7 +304,7 @@ export default function App() {
   }, [addMsg, sendToBackend])
 
   const reset = useCallback(() => {
-    setMessages([]); setInput(''); setShowZero(true); setSessionActive(false); setCheckoutActive(false)
+    setMessages([]); setInput(''); setShowZero(true); setSessionActive(false); checkoutActiveRef.current = false
     setTimeout(() => setWalletOpen(true), 300)
   }, [])
 
@@ -325,7 +333,14 @@ export default function App() {
               <span style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '8px', background: 'rgba(251,191,36,0.2)', color: '#92400e', fontWeight: 600 }}>{PERSONA.tier}</span>
             </div>
           )}
-          <div onClick={reset} title="New thread" style={{ width: '36px', height: '36px', borderRadius: '50%', background: sessionActive ? '#1a73e8' : '#e8eaed', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, color: sessionActive ? '#fff' : '#5f6368', cursor: 'pointer', flexShrink: 0 }}>
+          <button onClick={reset}
+            style={{ padding: '6px 14px', borderRadius: '20px', border: '1px solid #dadce0', background: '#fff', color: '#5f6368', fontSize: '13px', cursor: 'pointer', fontFamily: '"Google Sans",Arial,sans-serif', display: 'flex', alignItems: 'center', gap: '5px', transition: 'all 0.15s' }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = '#1a73e8'; e.currentTarget.style.color = '#1a73e8' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = '#dadce0'; e.currentTarget.style.color = '#5f6368' }}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z" /></svg>
+            New session
+          </button>
+          <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: sessionActive ? '#1a73e8' : '#e8eaed', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', fontWeight: 700, color: sessionActive ? '#fff' : '#5f6368', flexShrink: 0 }}>
             {sessionActive ? PERSONA.initials : <svg width="18" height="18" viewBox="0 0 24 24" fill="#5f6368"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" /></svg>}
           </div>
         </div>
