@@ -4,7 +4,7 @@ Cymbal Sports — FastAPI app
 - Gemini agent chat endpoint (POST /chat, SSE streaming)
 """
 
-import os, json, asyncio, inspect
+import os, json, asyncio, inspect, time
 from fastapi import FastAPI, Request
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -36,11 +36,7 @@ def _tool_schema(fn):
     required = []
     for name, param in sig.parameters.items():
         ann = param.annotation
-        if ann == int or ann == float:
-            ptype = "number"
-        else:
-            ptype = "string"
-        # get inline description from docstring
+        ptype = "number" if ann in (int, float) else "string"
         desc = name
         for line in (fn.__doc__ or "").split("\n"):
             line = line.strip()
@@ -62,7 +58,7 @@ def _tool_schema(fn):
 @app.post("/chat")
 async def chat(request: Request):
     body = await request.json()
-    messages = body.get("messages", [])   # full conversation history
+    messages = body.get("messages", [])
 
     async def stream():
         try:
@@ -80,17 +76,18 @@ async def chat(request: Request):
 
             tools_config = [{"function_declarations": [_tool_schema(fn) for fn in TOOLS]}]
 
-            # Build Gemini content history
+            # Build conversation history
             contents = []
             for m in messages:
                 role = "user" if m["role"] == "user" else "model"
                 contents.append({"role": role, "parts": [{"text": m["content"]}]})
 
-            # Agentic loop — keep calling until no more tool calls
-            _seen_tools = set()  # track which tools have run to prevent repeats
-            for _turn in range(12):
-                import time as _time
-                _t0 = _time.time()
+            # Agentic loop
+            # Each tool is allowed to run exactly once. Stop after create_checkout.
+            called = set()
+
+            for _turn in range(10):
+                t0 = time.time()
                 resp = client.models.generate_content(
                     model=model,
                     contents=contents,
@@ -100,44 +97,40 @@ async def chat(request: Request):
                         temperature=0.1,
                     ),
                 )
+                print(f"[GEMINI] turn={_turn} took {time.time()-t0:.2f}s", flush=True)
 
-                print(f"[GEMINI] turn={_turn} took {_time.time()-_t0:.2f}s", flush=True)
                 parts = resp.candidates[0].content.parts
                 texts = [p.text for p in parts if hasattr(p, "text") and p.text]
                 calls = [p.function_call for p in parts
                          if hasattr(p, "function_call") and p.function_call]
 
+                # Stream any text
                 if texts:
                     yield f"data: {json.dumps({'type':'text','content':' '.join(texts)})}\n\n"
                     await asyncio.sleep(0)
 
+                # No tool calls — Gemini is done
                 if not calls:
                     break
 
-                # Add model turn to history — must include raw parts (with thought_signature) intact
+                # Filter to only tools not yet called
+                new_calls = [c for c in calls if c.name not in called]
+
+                if not new_calls:
+                    # Gemini is trying to repeat tools — stop
+                    break
+
+                # Append raw model response (preserves thought_signature for Gemini 3)
                 contents.append(resp.candidates[0].content)
 
+                # Execute each new tool call
                 tool_results = []
-                # Deduplicate — skip any tool already called this session
-                deduped_calls = []
-                for call in calls:
-                    if call.name not in _seen_tools:
-                        deduped_calls.append(call)
-                calls = deduped_calls
-
-                # Only break on empty calls if checkout is done — otherwise keep looping
-                if not calls:
-                    if "create_checkout" in _seen_tools:
-                        break
-                    # No new tool calls but checkout not done — let Gemini continue
-                    contents.append(resp.candidates[0].content)
-                    continue
-
-                for call in calls:
-                    fn  = TOOL_MAP.get(call.name)
+                for call in new_calls:
+                    fn   = TOOL_MAP.get(call.name)
                     args = dict(call.args)
+                    called.add(call.name)
 
-                    # Emit tool_call event so UI can show the UCP badge
+                    print(f"[TOOL] {call.name}({args})", flush=True)
                     yield f"data: {json.dumps({'type':'tool_call','tool':call.name,'args':args})}\n\n"
                     await asyncio.sleep(0)
 
@@ -146,7 +139,6 @@ async def chat(request: Request):
                     except Exception as e:
                         result = {"error": str(e)}
 
-                    # Emit tool_result event so UI can render rich cards
                     yield f"data: {json.dumps({'type':'tool_result','tool':call.name,'result':result})}\n\n"
                     await asyncio.sleep(0)
 
@@ -154,16 +146,9 @@ async def chat(request: Request):
 
                 contents.append({"role": "user", "parts": tool_results})
 
-                # Add executed tools to seen set
-                for c in calls:
-                    _seen_tools.add(c.name)
-
-                # Stop after create_checkout — wait for user confirmation
-                if "create_checkout" in _seen_tools:
+                # Stop after create_checkout — hand back to user for confirmation
+                if "create_checkout" in called:
                     break
-
-                # Filter out any tools already seen to prevent repeat calls
-                # (applied on next iteration via dedup)
 
             yield f"data: {json.dumps({'type':'done'})}\n\n"
 
