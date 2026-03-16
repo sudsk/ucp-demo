@@ -76,7 +76,7 @@ async def chat(request: Request):
             from agent import SYSTEM_PROMPT, TOOL_MAP, TOOLS
 
             client = genai.Client(api_key=api_key)
-            model  = os.getenv("GEMINI_MODEL", "gemini-3-flash-preview")
+            model  = os.getenv("GEMINI_MODEL", "gemini-2.0-flash")
 
             tools_config = [{"function_declarations": [_tool_schema(fn) for fn in TOOLS]}]
 
@@ -110,11 +110,8 @@ async def chat(request: Request):
                 if not calls:
                     break
 
-                # Add model turn to history
-                contents.append({
-                    "role": "model",
-                    "parts": [{"function_call": {"name": c.name, "args": dict(c.args)}} for c in calls],
-                })
+                # Add model turn to history — must include raw parts (with thought_signature) intact
+                contents.append(resp.candidates[0].content)
 
                 tool_results = []
                 for call in calls:
