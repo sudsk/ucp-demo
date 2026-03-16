@@ -95,7 +95,6 @@ async def chat(request: Request):
                         system_instruction=SYSTEM_PROMPT,
                         tools=tools_config,
                         temperature=0.1,
-                        thinking_config=types.ThinkingConfig(thinking_level="none"),
                     ),
                 )
 
