@@ -95,6 +95,10 @@ def create_checkout(product_id: str, quantity: int = 1) -> dict:
     product_id: the product id from search results
     quantity: number of items (default 1)
     """
+    # Guard: reuse existing session if already created
+    if _state.get("checkout_id"):
+        return get_checkout()
+
     persona_key = _state.get("persona") or "guest"
     persona = PERSONAS[persona_key]
 
