@@ -276,12 +276,11 @@ export default function App() {
     const msg = (text || input).trim(); if (!msg || loading) return
     setInput(''); setShowZero(false)
     addMsg({ role:'user', text: msg })
-    // Inject Google Shopping shelf
+    // Show Google Shopping shelf only — Gemini backend handles UCP checkout, not discovery
     const qt = detectQueryType(msg)
     const shelf = SHOPPING_RESULTS[qt]
     setMessages(prev => [...prev, { id:`shelf-${Date.now()}`, role:'assistant', text: null, shoppingResults: shelf, lastTool: null }])
-    await sendToBackend(msg)
-  }, [input, loading, addMsg, sendToBackend])
+  }, [input, loading, addMsg])
 
   const handleBuy = useCallback((item) => {
     setShowZero(false)
