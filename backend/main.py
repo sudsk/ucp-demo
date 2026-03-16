@@ -146,8 +146,26 @@ async def chat(request: Request):
 
                 contents.append({"role": "user", "parts": tool_results})
 
-                # Stop after create_checkout — hand back to user for confirmation
+                # After create_checkout — do one final Gemini call to get the summary text, then stop
                 if "create_checkout" in called:
+                    t0 = time.time()
+                    final = client.models.generate_content(
+                        model=model,
+                        contents=contents,
+                        config=types.GenerateContentConfig(
+                            system_instruction=SYSTEM_PROMPT,
+                            tools=tools_config,
+                            temperature=0.1,
+                            ),
+                    )
+                    print(f"[GEMINI] final summary took {time.time()-t0:.2f}s", flush=True)
+                    final_parts = final.candidates[0].content.parts
+                    final_texts = [p.text for p in final_parts if hasattr(p, "text") and p.text]
+                    if final_texts:
+                        yield f"data: {json.dumps({'type':'text','content':' '.join(final_texts)})}
+
+"
+                        await asyncio.sleep(0)
                     break
 
             yield f"data: {json.dumps({'type':'done'})}\n\n"
