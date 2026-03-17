@@ -59,6 +59,7 @@ def _tool_schema(fn):
 async def chat(request: Request):
     body = await request.json()
     messages = body.get("messages", [])
+    checkout_active = body.get("checkout_active", False)
 
     async def stream():
         try:
@@ -81,6 +82,25 @@ async def chat(request: Request):
             for m in messages:
                 role = "user" if m["role"] == "user" else "model"
                 contents.append({"role": role, "parts": [{"text": m["content"]}]})
+
+            # If this is a confirmation message, skip straight to confirm_payment
+            if checkout_active:
+                from tools import confirm_payment
+                print("[CONFIRM] checkout_active=True, calling confirm_payment directly", flush=True)
+                try:
+                    result = confirm_payment()
+                    yield f"data: {json.dumps({'type':'tool_call','tool':'confirm_payment','args':{}})}\n\n"
+                    await asyncio.sleep(0)
+                    yield f"data: {json.dumps({'type':'tool_result','tool':'confirm_payment','result':result})}\n\n"
+                    await asyncio.sleep(0)
+                    if result.get("order_id"):
+                        msg = f"Order confirmed! Your order ID is {result['order_id']}.\nEstimated delivery: {result.get('estimated_delivery', '3-5 working days')}."
+                        yield f"data: {json.dumps({'type':'text','content':msg})}\n\n"
+                        await asyncio.sleep(0)
+                except Exception as e:
+                    yield f"data: {json.dumps({'type':'error','content':str(e)})}\n\n"
+                yield f"data: {json.dumps({'type':'done'})}\n\n"
+                return
 
             # Agentic loop
             # Each tool is allowed to run exactly once. Stop after create_checkout.
@@ -146,20 +166,25 @@ async def chat(request: Request):
 
                 contents.append({"role": "user", "parts": tool_results})
 
-                # After create_checkout — extract the checkout result and summarise directly
+                # After create_checkout — build summary from tool_results
                 if "create_checkout" in called:
-                    # Find the checkout result from tool_results
-                    checkout_result = next((r["function_response"]["response"] for r in tool_results if r["function_response"]["name"] == "create_checkout"), None)
-                    if checkout_result and "total" in checkout_result:
+                    checkout_result = None
+                    for r in tool_results:
+                        if r["function_response"]["name"] == "create_checkout":
+                            checkout_result = r["function_response"]["response"]
+                            break
+                    print(f"[CHECKOUT RESULT] {checkout_result}", flush=True)
+                    if checkout_result and checkout_result.get("total"):
                         lines = []
-                        if checkout_result.get("line_items"):
-                            for li in checkout_result["line_items"]:
-                                lines.append(f"Item: {li['title']} x{li['qty']} — {li['unit_price']}")
-                        lines.append(f"Loyalty discount: -{checkout_result.get('discount', '£0.00')}")
+                        for li in (checkout_result.get("line_items") or []):
+                            lines.append(f"{li['title']} x{li['qty']} — {li['unit_price']}")
+                        lines.append(f"Discount: -{checkout_result.get('discount', '£0.00')}")
                         lines.append(f"VAT: {checkout_result.get('vat', '£0.00')}")
                         lines.append(f"Delivery: {checkout_result.get('delivery', '£0.00')}")
                         lines.append(f"Total: {checkout_result.get('total', '')}")
-                        summary = "Order Summary\n" + "\n".join(lines) + "\n\nShall I confirm this order?"
+                        if checkout_result.get("loyalty_note"):
+                            lines.append(checkout_result["loyalty_note"])
+                        summary = "\n".join(lines) + "\n\nShall I confirm this order?"
                         yield f"data: {json.dumps({'type':'text','content':summary})}\n\n"
                         await asyncio.sleep(0)
                     else:

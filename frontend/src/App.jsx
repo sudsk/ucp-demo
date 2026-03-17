@@ -254,7 +254,7 @@ export default function App() {
       setMessages(prev => [...prev.filter(m => m.id !== typingId), { id: aId, role: 'assistant', text: '', lastTool: null, products: null, checkout: null, receipt: null }])
     }
     try {
-      const res = await fetch(`${API}/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: [...history, { role: 'user', content: userText }] }) })
+      const res = await fetch(`${API}/chat`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ messages: [...history, { role: 'user', content: userText }], checkout_active: checkoutActiveRef.current }) })
       const reader = res.body.getReader(); const decoder = new TextDecoder(); let buf = ''
       while (true) {
         const { done, value } = await reader.read(); if (done) break
