@@ -52,11 +52,7 @@ def search_products(query: str = "", max_price_gbp: float = 999.0) -> dict:
     Returns a list of matching products with prices.
     """
     max_pence = int(max_price_gbp * 100)
-    resp = httpx.get(
-        f"{UCP_BASE}/products/search",
-        params={"q": query, "max_price": max_pence},
-        timeout=10,
-    )
+    resp = httpx.get(f"{UCP_BASE}/products/search", params={"q": query, "max_price": max_pence}, timeout=30)
     resp.raise_for_status()
     data = resp.json()
 
@@ -118,7 +114,7 @@ def create_checkout(product_id: str, quantity: int = 1) -> dict:
             "email": persona["email"],
         }
 
-    resp = httpx.post(f"{UCP_BASE}/checkouts", json=body, timeout=10)
+    resp = httpx.post(f"{UCP_BASE}/checkouts", json=body, timeout=30)
     if resp.status_code == 409:
         return {"error": resp.json().get("detail", "Item out of stock")}
     resp.raise_for_status()
@@ -163,7 +159,7 @@ def get_checkout(checkout_id: str = "") -> dict:
     if not cid:
         return {"error": "No active checkout. Please create a checkout first."}
 
-    resp = httpx.get(f"{UCP_BASE}/checkouts/{cid}", timeout=10)
+    resp = httpx.get(f"{UCP_BASE}/checkouts/{cid}", timeout=30)
     resp.raise_for_status()
     data = resp.json()
 
@@ -194,7 +190,7 @@ def confirm_payment(checkout_id: str = "") -> dict:
     if not cid:
         return {"error": "No active checkout. Please create a checkout first."}
 
-    resp = httpx.post(f"{UCP_BASE}/checkouts/{cid}/complete", timeout=10)
+    resp = httpx.post(f"{UCP_BASE}/checkouts/{cid}/complete", timeout=30)
     if resp.status_code == 409:
         return {"error": "This checkout has already been completed."}
     resp.raise_for_status()

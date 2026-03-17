@@ -3,7 +3,7 @@ import ProductCards from './components/ProductCards.jsx'
 import { CheckoutCard, ReceiptCard } from './components/OrderCards.jsx'
 import UCPBadge from './components/UCPBadge.jsx'
 
-const API = ''
+const API = 'http://localhost:8001'
 
 const PERSONA = { id: 'james', name: 'James Mitchell', email: 'james.mitchell@gmail.com', tier: 'Gold', hint: '5% loyalty', initials: 'JM' }
 
