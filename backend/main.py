@@ -146,24 +146,24 @@ async def chat(request: Request):
 
                 contents.append({"role": "user", "parts": tool_results})
 
-                # After create_checkout — do one final Gemini call to get the summary text, then stop
+                # After create_checkout — extract the checkout result and summarise directly
                 if "create_checkout" in called:
-                    t0 = time.time()
-                    final = client.models.generate_content(
-                        model=model,
-                        contents=contents,
-                        config=types.GenerateContentConfig(
-                            system_instruction=SYSTEM_PROMPT,
-                            tools=None,
-                            temperature=0.1,
-                        ),
-                    )
-                    print(f"[GEMINI] final summary took {time.time()-t0:.2f}s", flush=True)
-                    final_parts = final.candidates[0].content.parts
-                    final_texts = [p.text for p in final_parts if hasattr(p, "text") and p.text]
-                    print(f"[FINAL] texts={final_texts}, calls={[p.function_call.name for p in final_parts if hasattr(p, 'function_call') and p.function_call]}", flush=True)
-                    if final_texts:
-                        yield f"data: {json.dumps({'type':'text','content':' '.join(final_texts)})}\n\n"
+                    # Find the checkout result from tool_results
+                    checkout_result = next((r["function_response"]["response"] for r in tool_results if r["function_response"]["name"] == "create_checkout"), None)
+                    if checkout_result and "total" in checkout_result:
+                        lines = []
+                        if checkout_result.get("line_items"):
+                            for li in checkout_result["line_items"]:
+                                lines.append(f"Item: {li['title']} x{li['qty']} — {li['unit_price']}")
+                        lines.append(f"Loyalty discount: -{checkout_result.get('discount', '£0.00')}")
+                        lines.append(f"VAT: {checkout_result.get('vat', '£0.00')}")
+                        lines.append(f"Delivery: {checkout_result.get('delivery', '£0.00')}")
+                        lines.append(f"Total: {checkout_result.get('total', '')}")
+                        summary = "Order Summary\n" + "\n".join(lines) + "\n\nShall I confirm this order?"
+                        yield f"data: {json.dumps({'type':'text','content':summary})}\n\n"
+                        await asyncio.sleep(0)
+                    else:
+                        yield f"data: {json.dumps({'type':'text','content':'Checkout session created. Shall I confirm this order?'})}\n\n"
                         await asyncio.sleep(0)
                     break
 
