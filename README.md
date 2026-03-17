@@ -2,7 +2,7 @@
 
 A working demo of Google's Universal Commerce Protocol (UCP) built as a Google AI Mode skin.
 
-**Stack:** Official UCP Python SDK · Google Gemini (ADK) · FastAPI · React  
+**Stack:** Official UCP Python SDK · Google Gemini · FastAPI · React  
 **Demo persona:** James Mitchell · Gold tier · 5% loyalty discount  
 **UCP version:** `2026-01-11`
 
@@ -46,7 +46,7 @@ UCP kicks in                ← This is what EPAM builds for clients
 Order confirmed — buyer never left AI Mode
 ```
 
-The key insight: **discovery already worked**. UCP adds the transactional completion layer that didn't exist — letting an AI agent close the sale without redirecting the user to the retailer's site.
+The key insight: **discovery already worked**. UCP adds the transactional completion layer — letting an AI agent close the sale without redirecting the user to the retailer's site.
 
 ### UCP architecture
 
@@ -73,13 +73,33 @@ A UCP-compliant merchant publishes a discovery profile at `/.well-known/ucp`:
 }
 ```
 
-When an AI agent wants to transact, it reads this profile, negotiates capabilities, then drives the checkout state machine:
-
-```
-incomplete → requires_escalation → ready_for_complete → confirmed
-```
-
 UCP supports REST, MCP (Model Context Protocol), and A2A (Agent2Agent) as transport options, and is compatible with AP2 (Agent Payments Protocol) for secure payment tokenisation.
+
+---
+
+## Demo architecture — two servers, clean separation
+
+This demo runs as **two separate servers** reflecting the real-world architecture:
+
+```
+┌─────────────────────────────────────┐     ┌──────────────────────────────────────┐
+│  LEFT SIDE — Demo scaffolding only  │     │  RIGHT SIDE — What EPAM builds       │
+│  Simulates Google AI Mode           │     │  Real UCP merchant server            │
+│                                     │     │                                      │
+│  main.py          port 8001         │────▶│  merchant_app.py      port 8000      │
+│  agent.py                           │     │  merchant_server.py                  │
+│  tools.py                           │     │                                      │
+│  frontend/ (React)  port 3000       │     │  /.well-known/ucp                    │
+│                                     │     │  POST /checkouts                     │
+│  ← Throw away after demo            │     │  GET  /checkouts/{id}                │
+│    Google owns this in production   │     │  POST /checkouts/{id}/complete       │
+└─────────────────────────────────────┘     │  GET  /products/search               │
+                                            │                                      │
+                                            │  ← This is the client deliverable    │
+                                            └──────────────────────────────────────┘
+```
+
+**Why two servers?** Running them on the same port caused an async event loop deadlock — the AI agent's HTTP calls to the merchant server blocked uvicorn's event loop, preventing the merchant server from responding. Separate processes, separate event loops, no deadlock.
 
 ---
 
@@ -125,16 +145,15 @@ git clone https://github.com/Universal-Commerce-Protocol/python-sdk.git sdk/pyth
 
 ---
 
-### Step 2 — Backend
+### Step 2 — Python environment
 
 ```bash
 cd backend
 
-# Create and activate virtualenv
 python -m venv venv
 source venv/bin/activate        # Windows: venv\Scripts\activate
 
-# Install the UCP SDK from the local clone (Step 1 must be done first)
+# Install UCP SDK first (Step 1 must be done)
 pip install -e sdk/python
 
 # Install remaining dependencies
@@ -142,35 +161,60 @@ pip install -r requirements.txt
 
 # Configure environment
 cp ../.env.example .env
-# Edit .env — set GOOGLE_API_KEY=AIza...
-
-# Start the server
-uvicorn main:app --reload --port 8000
+# Edit .env and set:
+#   GOOGLE_API_KEY=AIza...
+#   GEMINI_MODEL=gemini-2.5-flash
 ```
-
-The backend serves two things on port 8000:
-- **Gemini agent** at `POST /chat` — drives the UCP flow via ADK tools
-- **UCP merchant server** at `/.well-known/ucp`, `/checkouts`, `/products/search`
 
 ---
 
-### Step 3 — Frontend
+### Step 3 — Start the merchant UCP server (RIGHT SIDE, port 8000)
+
+```bash
+cd backend
+source venv/bin/activate
+uvicorn merchant_app:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Verify it's running:
+```bash
+curl http://localhost:8000/.well-known/ucp
+```
+
+---
+
+### Step 4 — Start the AI agent server (LEFT SIDE, port 8001)
+
+In a second terminal:
+
+```bash
+cd backend
+source venv/bin/activate
+uvicorn main:app --host 0.0.0.0 --port 8001 --reload
+```
+
+---
+
+### Step 5 — Start the frontend (port 3000)
+
+In a third terminal:
 
 ```bash
 cd frontend
 npm install
-npm run dev
-# Open http://localhost:5173
+npm run dev -- --host 0.0.0.0 --port 3000
 ```
+
+Open `http://localhost:3000`
 
 ---
 
-### Step 4 — Run the demo
+### Step 6 — Run the demo
 
-1. Google Wallet modal fires on load — click **Continue as James Mitchell**
-2. Type a query, e.g. `Find me white Adidas trainers for men, size 8`
-3. Google Shopping shelf appears — 4 stores, only Cymbal Sports has **Buy with Google Wallet**
-4. Click **Buy with Google Wallet** — watch the 5 UCP step badges execute:
+1. **Google Wallet modal** fires on load — click **Continue as James Mitchell**
+2. **Type a query**, e.g. `Find me white Adidas trainers for men, size 8`
+3. **Google Shopping shelf** appears — 4 stores, only Cymbal Sports has **Buy with Google Wallet**
+4. **Click Buy with Google Wallet** — watch the UCP step badges execute:
 
 ```
 01 Credential_Set       Google Wallet identity passed to merchant
@@ -179,6 +223,51 @@ npm run dev
 04 Checkout_State       GET /checkouts/{id} — order assembled, loyalty applied
 05 Transaction_Receipt  POST /checkouts/{id}/complete — order confirmed
 ```
+
+5. **Review the order summary** — loyalty discount applied automatically
+6. **Type "yes"** — order confirmed, receipt shown with order ID
+
+---
+
+## Project structure
+
+```
+cymbal-ucp-demo/
+├── .env.example
+├── README.md
+├── backend/
+│   ├── merchant_app.py          # RIGHT SIDE — standalone UCP merchant server (port 8000)
+│   ├── merchant_server.py       # UCP endpoint implementations (real spec)
+│   ├── main.py                  # LEFT SIDE — AI agent / chat server (port 8001)
+│   ├── agent.py                 # Gemini system prompt (demo scaffolding)
+│   ├── tools.py                 # UCP tool wrappers calling port 8000 (demo scaffolding)
+│   ├── requirements.txt
+│   └── sdk/python/              # UCP SDK clone (git clone in Step 1)
+└── frontend/
+    ├── index.html
+    ├── package.json
+    └── src/
+        ├── App.jsx              # Google AI Mode UI skin (port 8001)
+        ├── index.css
+        └── components/
+            ├── UCPBadge.jsx     # Step badges (01–05)
+            ├── ProductCards.jsx # Cymbal catalogue cards
+            └── OrderCards.jsx   # Checkout + receipt cards
+```
+
+---
+
+## Environment variables
+
+```env
+GOOGLE_API_KEY=AIza...             # Required — Gemini API key
+GEMINI_MODEL=gemini-2.5-flash      # Recommended — stable, fast, good tool-calling
+```
+
+**Model notes:**
+- `gemini-2.5-flash` — recommended, stable GA, reliable tool chaining
+- `gemini-3-flash-preview` — faster but preview (no SLA), unreliable multi-step tool calls as of March 2026
+- `gemini-3.1-flash-lite-preview` — fastest, but also preview — wait for GA
 
 ---
 
@@ -195,42 +284,6 @@ npm run dev
 
 ---
 
-## Environment variables
-
-```env
-GOOGLE_API_KEY=AIza...           # Required — Gemini API key
-GEMINI_MODEL=gemini-2.5-flash    # Optional — defaults to gemini-2.5-flash
-```
-
----
-
-## Project structure
-
-```
-cymbal-ucp-demo/
-├── .env.example
-├── README.md
-├── backend/
-│   ├── main.py                  # FastAPI app + /chat SSE endpoint
-│   ├── merchant_server.py       # UCP merchant endpoints (real spec)
-│   ├── tools.py                 # Gemini ADK tools calling UCP endpoints
-│   ├── agent.py                 # Gemini agent definition
-│   ├── requirements.txt
-│   └── sdk/python/              # UCP SDK clone (git clone in Step 1)
-└── frontend/
-    ├── index.html
-    ├── package.json
-    └── src/
-        ├── App.jsx              # Google AI Mode UI skin
-        ├── index.css
-        └── components/
-            ├── UCPBadge.jsx     # Step badges (01–05)
-            ├── ProductCards.jsx # Cymbal catalogue cards
-            └── OrderCards.jsx   # Checkout + receipt cards
-```
-
----
-
 ## UK readiness — what to do when UCP goes live
 
 UCP launched in the US in January 2026 with Etsy and Wayfair as the first live merchants. Shopify, Target and Walmart are next. Google has confirmed global expansion is coming in 2026 but has not given a UK date.
@@ -239,7 +292,7 @@ UCP launched in the US in January 2026 with Etsy and Wayfair as the first live m
 
 **1. Merchant Center — get your feed right**
 
-UCP checkout eligibility is gated on Merchant Center data quality. Google is adding new product attributes specifically for conversational commerce (answers to common questions, compatible accessories, substitutes). Audit your feed now:
+UCP checkout eligibility is gated on Merchant Center data quality. Audit your feed now:
 
 - All products must have GTIN, accurate pricing, real-time inventory signals
 - Enable `native_commerce` product attribute when it becomes available in the UK
@@ -248,22 +301,20 @@ UCP checkout eligibility is gated on Merchant Center data quality. Google is add
 
 **2. Join the UCP waitlist**
 
-Google requires pre-approval before a merchant can go live on AI Mode and Gemini. Join at:
+Google requires pre-approval before a merchant can go live on AI Mode and Gemini:  
 `https://support.google.com/merchants/contact/ucp_integration_interest`
 
 Early UK merchants will have a significant advantage — Google's intent is to surface UCP-enabled listings more prominently in AI Mode than standard Shopping results.
 
 **3. Assess your checkout architecture**
 
-UCP requires your checkout backend to expose three endpoints (`POST /checkouts`, `GET /checkouts/{id}`, `POST /checkouts/{id}/complete`). Assess:
-
-- **Shopify merchants** — Shopify is building native UCP support via Agentic Storefronts. Minimal custom work needed.
+- **Shopify merchants** — native UCP support via Agentic Storefronts. Minimal custom work needed.
 - **Magento / BigCommerce / custom** — custom UCP integration required. This is the EPAM engagement.
-- **PSP** — Adyen, Stripe and Mastercard are UCP payment handler partners. Confirm your PSP is on the list.
+- **PSP** — Adyen, Stripe and Mastercard are confirmed UCP payment handler partners.
 
 **4. Loyalty programs**
 
-UCP includes a `dev.ucp.shopping.discount` capability that enables loyalty credentials to be passed from Google Wallet to the merchant at checkout. If you run a loyalty programme, this is the highest-value UCP feature for conversion — a customer's tier and points are known before they even start the checkout session.
+UCP includes a `dev.ucp.shopping.discount` capability that enables loyalty credentials to be passed from Google Wallet to the merchant at checkout — a customer's tier and points are known before checkout starts.
 
 **5. What EPAM delivers**
 
@@ -274,7 +325,7 @@ UCP includes a `dev.ucp.shopping.discount` capability that enables loyalty crede
 | PSP integration | Google Pay handler connected to Adyen / Stripe / existing PSP |
 | Loyalty integration | `dev.ucp.shopping.discount` extension connected to CRM/loyalty platform |
 | Merchant Center prep | Feed audit, `native_commerce` attribute, shipping/returns config |
-| Testing & compliance | UCP conformance test suite (`github.com/Universal-Commerce-Protocol/conformance`) |
+| Testing & compliance | UCP conformance test suite |
 
 **Rough timeline:** 8–12 weeks from engagement start to UCP-ready backend, assuming an existing OMS and PSP are in place.
 
@@ -292,7 +343,7 @@ When your client joins the UCP programme:
 6. Register the live `/.well-known/ucp` endpoint with Google via Merchant Center
 7. Run the official UCP conformance tests: `github.com/Universal-Commerce-Protocol/conformance`
 
-The protocol structure, checkout state machine, and SDK models in this demo are already production-spec.
+The protocol structure, checkout state machine, and SDK models in this demo are already production-spec. Only `merchant_app.py` and `merchant_server.py` are relevant to production — everything else is demo scaffolding.
 
 ---
 
